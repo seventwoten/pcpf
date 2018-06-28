@@ -1,0 +1,196 @@
+import cv2
+import numpy as np
+from math import sin, cos, pi
+import matplotlib.pyplot as plt
+
+
+def projectPoints(p, cam_pos, cam_or, f=1, bu=1, bv=1, u0=0, v0=0):
+    ''' 
+        Returns 2D projections (u, v) of 3d scene points specified 
+        with respect to world coordinates, on a camera at position 
+        cam_pos, and orientation cam_or. 
+    '''
+    
+    # Compute extrinsic matrix to tranform points from world coordinates to camera coordinates
+    R = cam_or.T
+    t = -np.dot(R, cam_pos.reshape(-1,1))
+    extrinsic = np.concatenate((R, t), axis = 1) 
+    
+    world_coords = np.concatenate((p, np.ones((p.shape[0], 1))), axis = 1)
+    
+    # scene points in camera coordinates
+    s = np.dot(extrinsic, world_coords.T).T
+    
+    i_f = np.array([[1.0,0.0,0.0]]).T
+    j_f = np.array([[0.0,1.0,0.0]]).T
+    k_f = np.array([[0.0,0.0,1.0]]).T
+    
+    u = ( f * bu * np.dot(s, i_f ))/( np.dot(s, k_f) ) + u0
+    v = ( f * bv * np.dot(s, j_f ))/( np.dot(s, k_f) ) + v0
+    return u, v
+    
+def translate_camera(x=0, y=0, z=0):
+    ''' 
+        Translates camera from world coordinates, 
+        then displays the camera image with matplotlib.pyplot
+    '''
+
+    cam_pos = np.array([x, y, z])
+    u, v = projectPoints(p, cam_pos, i_f, j_f, k_f, f, bu, bv, u0, v0)
+    
+    plt.plot(u, v, 'b*'), plt.axis([-bu, bu, -bv, bv])
+    plt.show()
+    return np.concatenate((u, v), axis = 1)
+
+def rpy2R(roll, pitch, yaw):
+    ''' Converts roll, pitch, yaw (right-handed and in radians) to a rotation matrix.
+    '''
+    
+    cos_r = cos(roll)
+    cos_p = cos(pitch)
+    cos_y = cos(yaw)
+    
+    sin_r = sin(roll)
+    sin_p = sin(pitch)
+    sin_y = sin(yaw)
+    
+    R = np.array([[cos_r*cos_y,  cos_r*sin_y*sin_p - sin_r*cos_p,  cos_r*sin_y*cos_p + sin_r*sin_p],
+                  [sin_r*cos_y,  sin_r*sin_y*sin_p + cos_r*cos_p,  sin_r*sin_y*cos_p - cos_r*sin_p],
+                  [-sin_y     ,  cos_y*sin_p                    ,  cos_y*cos_p                    ]])
+    
+    return R
+
+def transform_camera(p, x=0, y=0, z=1, 
+                     roll=0, pitch=0, yaw=0, 
+                     f=1, bu=1, bv=1, u0=0, v0=0):
+    ''' 
+        Transforms camera from an initial location and pose aligned to world coordinates, 
+        then displays the camera image with matplotlib.pyplot
+    '''
+    
+    # Starting point
+    cam_pos = np.array([0.0, 0.0, 0.0])
+    cam_or = np.eye(3)
+    
+    # Rotate camera
+    cam_or2 = rpy2R(roll, pitch, yaw)
+    print(cam_or2)
+    
+    # Translate camera
+    cam_pos2 = cam_pos + np.array([x, y, z])
+    print(cam_pos2)
+    
+    # Call projectPoints with new position and orientation
+    u, v = projectPoints(p, cam_pos2, cam_or2, f, bu, bv, u0, v0)
+    
+    # Display camera image 
+    plt.plot(u, v, 'b*'), plt.axis([-bu, bu, -bv, bv]), plt.gca().invert_yaxis()
+    plt.show()
+    return np.concatenate((u, v), axis = 1)
+    
+def getEpilineDeviations(line, pts1):
+    ''' 
+        Returns squared vertical distances of img 1 points from epipolar line. Shape: (n_points, 1)
+
+        Parameters
+        ----------
+        line  - coefficients of epiline on img 1, (a, b, c). Shape: (1, 3)
+        pts1  - points in img 1. Shape: (n_points, 2)
+        
+    '''
+    # Add one-padding for matrix multiplication
+    pts = np.concatenate((pts1, np.ones((pts1.shape[0], 1))), axis = 1)
+    
+    # Compute result of au + bv + c = d. Shape: (n_points, 1)
+    d = np.dot(pts, line.T)
+    
+    # Vertical distance from line is d/b. Compute square of this distance:
+    return (d/line[0,1]) ** 2
+
+def generate_xyz(n_samples):
+    ''' Returns n_samples uniformly distributed sample guesses in 3 dimensions, 
+        within range [-1,1] in each dimension.
+    '''
+    return np.random.rand(3, n_samples) * 2 - np.array([[1,1,1]]).T
+    
+
+    
+def generate_xyz_rpy(n_samples, xyz_start, xyz_end, rpy_start, rpy_end):
+    ''' Returns n_samples uniformly distributed sample guesses in 
+        3 dimensions of space, and 3 dimensions of rotation. 
+        The first 3 dimensions (x, y, z) are in range [-1,1]. 
+        The next 3 dimensions (roll, pitch, yaw) are in range [-pi/2, pi/2].
+    '''
+    xyz_rpy = np.random.rand(6, n_samples) 
+    
+    xyz_rpy[:3, :] = xyz_rpy[:3, :] * (xyz_end - xyz_start) + xyz_start
+    xyz_rpy[3:, :] = xyz_rpy[3:, :] * (rpy_end - rpy_start) + rpy_start
+    
+    return xyz_rpy
+    
+def ParticleFilter(S, sigma_xyz, sigma_rpy, pts1, pts2, epsilon = 1):
+    ''' S         - Represents state-weight pairs. Shape: (dim+1, m) 
+                    The first dim rows store m sample states, and the last row stores their importance weights. 
+        sigma_xyz - Standard deviation of Gaussian used for resampling in x, y, z
+        sigma_rpy - Standard deviation of Gaussian used for resampling in r, p, y
+        pts1      - Points from first image
+        pts2      - Points from second image (used to draw epilines on first image)
+        epsilon   - Threshold of squared vertical deviation, for counting a point as "near" to an epiline
+    '''
+    dim = S.shape[0] - 1
+    m   = S.shape[1]
+    weights = np.zeros((1, m))
+    normaliser = 0
+    S_new = np.empty((dim+1, 0))
+    
+    # for debugging 
+    score_list = []
+    not_match_count = 0
+    matches = 0
+    
+    for i in range(m):
+        # Sample with replacement
+        ind = np.random.choice(m, 1, p=S[dim,:].tolist())[0]
+        
+        # Perturb sample state (state represented by translation vector)
+        pt = S[:dim,ind]
+        t = np.random.normal(loc=pt[:3], scale=sigma_xyz, size=None) 
+        r = np.random.normal(loc=pt[3:], scale=sigma_rpy, size=None) 
+        
+        # Compute score of new sample state
+        score = 0
+        T = np.array([[     0, -t[2],  t[1] ],
+                      [  t[2],     0, -t[0] ],
+                      [ -t[1],  t[0],     0 ]])
+        
+        R = rpy2R(r[0], r[1], r[2])
+        
+        E = np.dot(T, R)
+        
+        lines1 = cv2.computeCorrespondEpilines(pts2.reshape(-1,1,2), 2, E) # Shape: (n_pts2, 3)
+        for j in range(lines1.shape[0]):
+            sqdists = getEpilineDeviations(lines1[j, :], pts1)
+            if np.any(sqdists < epsilon): 
+                matches += 1
+                if j != np.argmin(sqdists): 
+                    # print("not a match:" + str(j) + " " + str(np.argmin(sqdists)))
+                    not_match_count += 1
+                score += 1
+                
+        score_list.append(score)
+        
+        # Add new point to output S_new
+        new_pt = np.array([[*t, *r, score]]).T
+        S_new = np.concatenate((S_new, new_pt), axis = 1)
+        
+        normaliser += score
+    
+    # Normalise weights in S_new
+    # S_new[dim,:] = S_new[3,:]/normaliser
+    
+    # Instead of normalising, use softmax function
+    scale = pts1.shape[0] / 10  #arbitrary scaling factor
+    S_new[dim,:] = np.exp(S_new[dim,:]/scale)/np.sum(np.exp(S_new[dim,:]/scale))
+    
+    return S_new, score_list, not_match_count, matches
+    
