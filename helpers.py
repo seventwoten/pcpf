@@ -1,8 +1,8 @@
 import cv2
 import numpy as np
-from math import sin, cos, pi
+from math import sin, cos, pi, inf
 import matplotlib.pyplot as plt
-
+from scipy.linalg import null_space
 
 def projectPoints(p, cam_pos, cam_or, f=1, bu=1, bv=1, u0=0, v0=0):
     ''' 
@@ -167,9 +167,19 @@ def ParticleFilter(S, sigma_xyz, sigma_rpy, pts1, pts2, epsilon = 1):
         
         E = np.dot(T, R)
         
+        # Compute epipole to ignore nearest points
+        epipole = null_space(E.T)
+        epipole = epipole / epipole[2]  # Normalise to image point (u, v, 1)
+        
         lines1 = cv2.computeCorrespondEpilines(pts2.reshape(-1,1,2), 2, E) # Shape: (n_pts2, 3)
         for j in range(lines1.shape[0]):
             sqdists = getEpilineDeviations(lines1[j, :], pts1)
+            
+            # Ignore points in pts1 too close to epipole
+            for k in range(pts1.shape[0]):
+                if np.linalg.norm(pts1[k]-epipole) < 0.001:
+                    sqdists[k] = inf
+                    
             if np.any(sqdists < epsilon): 
                 matches += 1
                 if j != np.argmin(sqdists): 
