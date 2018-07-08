@@ -134,14 +134,17 @@ def generate_xyz_rpy(n_samples, xyz_start, xyz_end, rpy_start, rpy_end):
     
     return xyz_rpy
     
-def ParticleFilter(S, sigma, pts1, pts2, epsilon = 1, epipole_t = 0.1):
+def ParticleFilter(S, sigma, pts1, pts2, epsilon = 1, epipole_t = 0.1, 
+                   norm_mode = None ):
     ''' S         - Represents state-weight pairs. Shape: (dim+1, m) 
                     The first dim rows store m sample states, and the last row stores their importance weights. 
-        sigma - Standard deviation of Gaussian used for resampling in dim dimensions
+        sigma     - Standard deviation of Gaussian used for resampling in dim dimensions
         pts1      - Points from first image
         pts2      - Points from second image (used to draw epilines on first image)
         epsilon   - Threshold of squared vertical deviation, for counting a point as "near" to an epiline
         epipole_t - Threshold for ignoring a point too close to epipole
+        norm_mode - Mode of normalisation for importance weights. 
+                    Default: divide by total of scores over all samples.
     '''
     dim = S.shape[0] - 1
     m   = S.shape[1]
@@ -198,11 +201,14 @@ def ParticleFilter(S, sigma, pts1, pts2, epsilon = 1, epipole_t = 0.1):
         normaliser += score
     
     # Normalise weights in S_new
-    # S_new[dim,:] = S_new[3,:]/normaliser
+    if norm_mode == "softmax": 
+        # Use softmax function
+        S_new[dim,:] = np.exp(S_new[dim,:]) / np.sum(np.exp(S_new[dim,:]))
+        
+    else:
+        S_new[dim,:] = S_new[dim,:]/normaliser
     
-    # Instead of normalising, use softmax function
-    scale = pts1.shape[0] / 10  #arbitrary scaling factor
-    S_new[dim,:] = np.exp(S_new[dim,:]/scale)/np.sum(np.exp(S_new[dim,:]/scale))
+    
     
     return S_new, score_list, mismatches, matches
     
