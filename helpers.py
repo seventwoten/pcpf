@@ -134,11 +134,10 @@ def generate_xyz_rpy(n_samples, xyz_start, xyz_end, rpy_start, rpy_end):
     
     return xyz_rpy
     
-def ParticleFilter(S, sigma_xyz, sigma_rpy, pts1, pts2, epsilon = 1, epipole_t = 0.1):
+def ParticleFilter(S, sigma, pts1, pts2, epsilon = 1, epipole_t = 0.1):
     ''' S         - Represents state-weight pairs. Shape: (dim+1, m) 
                     The first dim rows store m sample states, and the last row stores their importance weights. 
-        sigma_xyz - Standard deviation of Gaussian used for resampling in x, y, z
-        sigma_rpy - Standard deviation of Gaussian used for resampling in r, p, y
+        sigma - Standard deviation of Gaussian used for resampling in dim dimensions
         pts1      - Points from first image
         pts2      - Points from second image (used to draw epilines on first image)
         epsilon   - Threshold of squared vertical deviation, for counting a point as "near" to an epiline
@@ -159,16 +158,15 @@ def ParticleFilter(S, sigma_xyz, sigma_rpy, pts1, pts2, epsilon = 1, epipole_t =
         # Sample with replacement
         ind = np.random.choice(m, 1, p=S[dim,:].tolist())[0]
         
-        # Perturb sample state (state represented by translation vector)
+        # Perturb sample state
         pt = S[:dim,ind]
-        t = np.random.normal(loc=pt[:3], scale=sigma_xyz, size=None) 
-        r = np.random.normal(loc=pt[3:], scale=sigma_rpy, size=None) 
+        t = np.random.normal(loc=pt, scale=sigma, size=None)
         
         # Compute score of new sample state
         score = 0
         
         T = xyz2T(t[0], t[1], t[2])
-        R = rpy2R(r[0], r[1], r[2])
+        R = rpy2R(t[3], t[4], t[5])
         E = np.dot(T, R)
         
         # Compute epipole to ignore nearest points
@@ -194,7 +192,7 @@ def ParticleFilter(S, sigma_xyz, sigma_rpy, pts1, pts2, epsilon = 1, epipole_t =
         score_list.append(score)
         
         # Add new point to output S_new
-        new_pt = np.array([[*t, *r, score]]).T
+        new_pt = np.array([[*t, score]]).T
         S_new = np.concatenate((S_new, new_pt), axis = 1)
         
         normaliser += score
