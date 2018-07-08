@@ -60,6 +60,12 @@ def rpy2R(roll, pitch, yaw):
     
     return R
 
+def xyz2T(x, y, z):
+    T = np.array([[  0, -z,  y ],
+                  [  z,  0, -x ],
+                  [ -y,  x,  0 ]])
+    return T
+
 def transform_camera(p, x=0, y=0, z=1, 
                      roll=0, pitch=0, yaw=0, 
                      f=1, bu=1, bv=1, u0=0, v0=0):
@@ -159,12 +165,9 @@ def ParticleFilter(S, sigma_xyz, sigma_rpy, pts1, pts2, epsilon = 1):
         
         # Compute score of new sample state
         score = 0
-        T = np.array([[     0, -t[2],  t[1] ],
-                      [  t[2],     0, -t[0] ],
-                      [ -t[1],  t[0],     0 ]])
         
+        T = xyz2T(t[0], t[1], t[2])
         R = rpy2R(r[0], r[1], r[2])
-        
         E = np.dot(T, R)
         
         # Compute epipole to ignore nearest points
