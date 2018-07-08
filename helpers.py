@@ -152,7 +152,7 @@ def ParticleFilter(S, sigma_xyz, sigma_rpy, pts1, pts2, epsilon = 1, epipole_t =
     
     # for debugging 
     score_list = []
-    not_match_count = 0
+    mismatches = 0
     matches = 0
     
     for i in range(m):
@@ -186,9 +186,9 @@ def ParticleFilter(S, sigma_xyz, sigma_rpy, pts1, pts2, epsilon = 1, epipole_t =
                     
             if np.any(sqdists < epsilon): 
                 matches += 1
-                if j != np.argmin(sqdists): 
+                if sqdists[j,0] > epsilon:
                     # print("not a match:" + str(j) + " " + str(np.argmin(sqdists)))
-                    not_match_count += 1
+                    mismatches += 1
                 score += 1
                 
         score_list.append(score)
@@ -206,5 +206,5 @@ def ParticleFilter(S, sigma_xyz, sigma_rpy, pts1, pts2, epsilon = 1, epipole_t =
     scale = pts1.shape[0] / 10  #arbitrary scaling factor
     S_new[dim,:] = np.exp(S_new[dim,:]/scale)/np.sum(np.exp(S_new[dim,:]/scale))
     
-    return S_new, score_list, not_match_count, matches
+    return S_new, score_list, mismatches, matches
     
