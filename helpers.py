@@ -134,7 +134,7 @@ def generate_xyz_rpy(n_samples, xyz_start, xyz_end, rpy_start, rpy_end):
     
     return xyz_rpy
     
-def ParticleFilter(S, sigma_xyz, sigma_rpy, pts1, pts2, epsilon = 1):
+def ParticleFilter(S, sigma_xyz, sigma_rpy, pts1, pts2, epsilon = 1, epipole_t = 0.1):
     ''' S         - Represents state-weight pairs. Shape: (dim+1, m) 
                     The first dim rows store m sample states, and the last row stores their importance weights. 
         sigma_xyz - Standard deviation of Gaussian used for resampling in x, y, z
@@ -142,6 +142,7 @@ def ParticleFilter(S, sigma_xyz, sigma_rpy, pts1, pts2, epsilon = 1):
         pts1      - Points from first image
         pts2      - Points from second image (used to draw epilines on first image)
         epsilon   - Threshold of squared vertical deviation, for counting a point as "near" to an epiline
+        epipole_t - Threshold for ignoring a point too close to epipole
     '''
     dim = S.shape[0] - 1
     m   = S.shape[1]
@@ -180,7 +181,7 @@ def ParticleFilter(S, sigma_xyz, sigma_rpy, pts1, pts2, epsilon = 1):
             
             # Ignore points in pts1 too close to epipole
             for k in range(pts1.shape[0]):
-                if np.linalg.norm(pts1[k]-epipole) < 0.001:
+                if np.linalg.norm(pts1[k]-epipole) < epipole_t:
                     sqdists[k] = inf
                     
             if np.any(sqdists < epsilon): 
