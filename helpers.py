@@ -112,28 +112,18 @@ def getEpilineDeviations(line, pts1):
     
     # Vertical distance from line is d/b. Compute square of this distance:
     return (d/line[0,1]) ** 2
+    
+def generate_samples(n_samples, ranges):
+    ''' Returns n_samples uniformly-distributed sample guesses in 
+        n_dims dimensions, with shape (n_dims, n_samples).
+        ranges has shape (n_dims, 2), with two values in each row, 
+        specifying the start and end in each dimension.
+    ''' 
+    n_dims = ranges.shape[0]
+    samples = np.random.rand(n_dims, n_samples) * (ranges[:, 1, None] - ranges[:, 0, None]) + ranges[:, 0, None]
+    
+    return samples
 
-def generate_xyz(n_samples):
-    ''' Returns n_samples uniformly distributed sample guesses in 3 dimensions, 
-        within range [-1,1] in each dimension.
-    '''
-    return np.random.rand(3, n_samples) * 2 - np.array([[1,1,1]]).T
-    
-
-    
-def generate_xyz_rpy(n_samples, xyz_start, xyz_end, rpy_start, rpy_end):
-    ''' Returns n_samples uniformly distributed sample guesses in 
-        3 dimensions of space, and 3 dimensions of rotation. 
-        The first 3 dimensions (x, y, z) are in range [-1,1]. 
-        The next 3 dimensions (roll, pitch, yaw) are in range [-pi/2, pi/2].
-    '''
-    xyz_rpy = np.random.rand(6, n_samples) 
-    
-    xyz_rpy[:3, :] = xyz_rpy[:3, :] * (xyz_end - xyz_start) + xyz_start
-    xyz_rpy[3:, :] = xyz_rpy[3:, :] * (rpy_end - rpy_start) + rpy_start
-    
-    return xyz_rpy
-    
 def ParticleFilter(S, sigma, pts1, pts2, epsilon = 1, epipole_t = 0.1, 
                    norm_mode = None ):
     ''' S         - Represents state-weight pairs. Shape: (dim+1, m) 
