@@ -134,7 +134,8 @@ def ParticleFilter(S, sigma, pts1, pts2, epsilon = 1, epipole_t = 0.1,
         epsilon   - Threshold of squared vertical deviation, for counting a point as "near" to an epiline
         epipole_t - Threshold for ignoring a point too close to epipole
         norm_mode - Mode of normalisation for importance weights. 
-                    Default: divide by total of scores over all samples.
+                    Default  : divide by total of scores over all samples.
+                    "softmax": take exp() of each score and normalise over all samples. 
     '''
     dim = S.shape[0] - 1
     m   = S.shape[1]
