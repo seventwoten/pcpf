@@ -124,8 +124,7 @@ def generate_samples(n_samples, ranges):
     
     return samples
 
-def ParticleFilter(S, sigma, pts1, pts2, epsilon = 1, epipole_t = 0.1, 
-                   norm_mode = None ):
+def ParticleFilter(S, sigma, pts1, pts2, epsilon = 1, epipole_t = 0.01, norm_mode = None ):
     ''' S         - Represents state-weight pairs. Shape: (dim+1, m) 
                     The first dim rows store m sample states, and the last row stores their importance weights. 
         sigma     - Standard deviation of Gaussian used for resampling in dim dimensions
@@ -167,7 +166,7 @@ def ParticleFilter(S, sigma, pts1, pts2, epsilon = 1, epipole_t = 0.1,
         epipole = null_space(E.T)
         epipole = epipole / epipole[2]  # Normalise to image point (u, v, 1)
         
-        lines1 = cv2.computeCorrespondEpilines(pts2.reshape(-1,1,2), 2, E) # Shape: (n_pts2, 3)
+        lines1 = cv2.computeCorrespondEpilines(pts2.reshape(-1,1,2), 1, E) # Shape: (n_pts2, 3)
         for j in range(lines1.shape[0]):
             sqdists = getEpilineDeviations(lines1[j, :], pts1)
             
