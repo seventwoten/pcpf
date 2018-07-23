@@ -27,9 +27,14 @@ def projectPoints(p, cam_pos, cam_or, f=1, bu=1, bv=1, u0=0, v0=0):
     
     u = ( f * bu * np.dot(s, i_f ))/( np.dot(s, k_f) ) + u0
     v = ( f * bv * np.dot(s, j_f ))/( np.dot(s, k_f) ) + v0
+    
+    # set points behind camera to [inf, inf, inf]
+    u[s[:, 2] < 0] = inf
+    v[s[:, 2] < 0] = inf
+    
     return u, v
     
-def translate_camera(x=0, y=0, z=0):
+def translateCamera(x=0, y=0, z=0):
     ''' 
         Translates camera from world coordinates, 
         then displays the camera image with matplotlib.pyplot
@@ -66,7 +71,7 @@ def xyz2T(x, y, z):
                   [ -y,  x,  0 ]])
     return T
 
-def transform_camera(p, x=0, y=0, z=1, 
+def transformCamera(p, x=0, y=0, z=0, 
                      roll=0, pitch=0, yaw=0, 
                      f=1, bu=1, bv=1, u0=0, v0=0):
     ''' 
@@ -113,7 +118,7 @@ def getEpilineDeviations(line, pts1):
     # Vertical distance from line is d/b. Compute square of this distance:
     return (d/line[0,1]) ** 2
     
-def generate_samples(n_samples, ranges):
+def generateSamples(n_samples, ranges):
     ''' Returns n_samples uniformly-distributed sample guesses in 
         n_dims dimensions, with shape (n_dims, n_samples).
         ranges has shape (n_dims, 2), with two values in each row, 
