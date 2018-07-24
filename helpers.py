@@ -129,12 +129,46 @@ def generateSamples(n_samples, ranges):
     
     return samples
 
-def ParticleFilter(S, sigma, pts1, pts2, epsilon = 1, epipole_t = 0.01, norm_mode = None ):
+    
+def computeScore(t, pts1, pts2, n_corr, epsilon, epipole_t):
+    ''' Computes score of sample state t
+    '''
+    score = 0
+    mismatches = 0
+    
+    T = xyz2T(t[0], t[1], t[2])
+    R = rpy2R(t[3], t[4], t[5])
+    E = np.dot(T, R)
+    
+    # Compute epipole to ignore nearest points
+    epipole = null_space(E.T)
+    epipole = (epipole / epipole[2])[:2,0]  # Normalise to image point (u, v, 1)
+
+    lines1 = cv2.computeCorrespondEpilines(pts2.reshape(-1,1,2), 1, E) # Shape: (n_pts2, 3)
+    for j in range(lines1.shape[0]):
+        sqdists = getEpilineDeviations(lines1[j, :], pts1)
+        
+        # Ignore points in pts1 too close to epipole
+        for k in range(pts1.shape[0]):
+            if np.linalg.norm(pts1[k]-epipole) < epipole_t:
+                print(k)
+                sqdists[k] = inf
+                
+        if np.any(sqdists < epsilon): 
+            if sqdists[j,0] > epsilon or j >= n_corr:
+                # print("not a match:" + str(j) + " " + str(np.argmin(sqdists)))
+                mismatches += 1
+            score += 1
+            
+    return score, mismatches
+    
+def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 1, epipole_t = 0.01, norm_mode = None):
     ''' S         - Represents state-weight pairs. Shape: (dim+1, m) 
                     The first dim rows store m sample states, and the last row stores their importance weights. 
         sigma     - Standard deviation of Gaussian used for resampling in dim dimensions
         pts1      - Points from first image
         pts2      - Points from second image (used to draw epilines on first image)
+        n_corr    - The first n_corr points in each image are true correspondences, and the rest are noise points
         epsilon   - Threshold of squared vertical deviation, for counting a point as "near" to an epiline
         epipole_t - Threshold for ignoring a point too close to epipole
         norm_mode - Mode of normalisation for importance weights. 
@@ -160,34 +194,10 @@ def ParticleFilter(S, sigma, pts1, pts2, epsilon = 1, epipole_t = 0.01, norm_mod
         pt = S[:dim,ind]
         t = np.random.normal(loc=pt, scale=sigma, size=None)
         
-        # Compute score of new sample state
-        score = 0
-        
-        T = xyz2T(t[0], t[1], t[2])
-        R = rpy2R(t[3], t[4], t[5])
-        E = np.dot(T, R)
-        
-        # Compute epipole to ignore nearest points
-        epipole = null_space(E.T)
-        epipole = epipole / epipole[2]  # Normalise to image point (u, v, 1)
-        
-        lines1 = cv2.computeCorrespondEpilines(pts2.reshape(-1,1,2), 1, E) # Shape: (n_pts2, 3)
-        for j in range(lines1.shape[0]):
-            sqdists = getEpilineDeviations(lines1[j, :], pts1)
-            
-            # Ignore points in pts1 too close to epipole
-            for k in range(pts1.shape[0]):
-                if np.linalg.norm(pts1[k]-epipole) < epipole_t:
-                    sqdists[k] = inf
-                    
-            if np.any(sqdists < epsilon): 
-                matches += 1
-                if sqdists[j,0] > epsilon:
-                    # print("not a match:" + str(j) + " " + str(np.argmin(sqdists)))
-                    mismatches += 1
-                score += 1
-                
+        score, sample_mismatches = computeScore(t, pts1, pts2, n_corr, epsilon, epipole_t)
         score_list.append(score)
+        matches += score
+        mismatches += sample_mismatches
         
         # Add new point to output S_new
         new_pt = np.array([[*t, score]]).T
