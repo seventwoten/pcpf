@@ -71,9 +71,9 @@ def xyz2T(x, y, z):
                   [ -y,  x,  0 ]])
     return T
 
-def transformCamera(p, x=0, y=0, z=0, 
-                     roll=0, pitch=0, yaw=0, 
-                     f=1, bu=1, bv=1, u0=0, v0=0):
+def transformCamera(p, display=True, x=0, y=0, z=0, 
+                    roll=0, pitch=0, yaw=0, 
+                    f=1, bu=1, bv=1, u0=0, v0=0):
     ''' 
         Transforms camera from an initial location and pose aligned to world coordinates, 
         then displays the camera image with matplotlib.pyplot
@@ -85,18 +85,19 @@ def transformCamera(p, x=0, y=0, z=0,
     
     # Rotate camera
     cam_or2 = rpy2R(roll, pitch, yaw)
-    print(cam_or2)
+    # print(cam_or2)
     
     # Translate camera
     cam_pos2 = cam_pos + np.array([x, y, z])
-    print(cam_pos2)
+    # print(cam_pos2)
     
     # Call projectPoints with new position and orientation
     u, v = projectPoints(p, cam_pos2, cam_or2, f, bu, bv, u0, v0)
     
     # Display camera image 
-    plt.plot(u, v, 'b*'), plt.axis([-bu, bu, -bv, bv]), plt.gca().invert_yaxis()
-    plt.show()
+    if display:
+        plt.plot(u, v, 'b*'), plt.axis([-bu, bu, -bv, bv]), plt.gca().invert_yaxis()
+        plt.show()
     return np.concatenate((u, v), axis = 1)
     
 def getEpilineDeviations(line, pts1):
