@@ -130,11 +130,12 @@ def generateSamples(n_samples, ranges):
     return samples
 
     
-def computeScore(t, pts1, pts2, n_corr, epsilon, epipole_t):
+def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t):
     ''' Computes score of sample state t
     '''
     score = 0
     mismatches = 0
+    pts1 = orig_pts1.copy()
     
     T = xyz2T(t[0], t[1], t[2])
     R = rpy2R(t[3], t[4], t[5])
@@ -145,20 +146,27 @@ def computeScore(t, pts1, pts2, n_corr, epsilon, epipole_t):
     epipole = (epipole / epipole[2])[:2,0]  # Normalise to image point (u, v, 1)
 
     lines1 = cv2.computeCorrespondEpilines(pts2.reshape(-1,1,2), 1, E) # Shape: (n_pts2, 3)
+    curr_indices = list(range(pts1.shape[0]))
+    
     for j in range(lines1.shape[0]):
         sqdists = getEpilineDeviations(lines1[j, :], pts1)
         
         # Ignore points in pts1 too close to epipole
         for k in range(pts1.shape[0]):
             if np.linalg.norm(pts1[k]-epipole) < epipole_t:
-                print(k)
                 sqdists[k] = inf
-                
-        if np.any(sqdists < epsilon): 
-            if sqdists[j,0] > epsilon or j >= n_corr:
+        
+        if np.any(sqdists < epsilon):
+            score += 1
+            
+            min_pt = curr_indices[np.argmin(sqdists)]
+            if j != min_pt or j >= n_corr:
                 # print("not a match:" + str(j) + " " + str(np.argmin(sqdists)))
                 mismatches += 1
-            score += 1
+                
+            # choose the point with smallest sqdist, remove it from matchable points pts1
+            curr_indices.remove(min_pt)
+            pts1 = orig_pts1[curr_indices]
             
     return score, mismatches
     
