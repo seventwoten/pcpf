@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from math import sin, cos, pi, inf
+from math import sin, cos, pi, inf, sqrt, atan
 import matplotlib.pyplot as plt
 from scipy.linalg import null_space
 
@@ -130,6 +130,17 @@ def generateSamples(n_samples, ranges):
     
     return samples
 
+def sphericalToCartesian(r, theta, phi):
+    x = r * sin(phi) * cos(theta)
+    y = r * sin(phi) * sin(theta)
+    z = r * cos(phi)
+    return x, y, z
+
+def cartesianToSpherical(x, y, z):
+    r     = sqrt(x**2 + y**2 + z**2)
+    theta = atan(y/x)
+    phi   = atan(sqrt(x**2 + y**2)/z)
+    return r, theta, phi    
     
 def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t):
     ''' Computes score of sample state t
@@ -138,8 +149,8 @@ def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t):
     mismatches = 0
     pts1 = orig_pts1.copy()
     
-    T = xyz2T(t[0], t[1], t[2])
-    R = rpy2R(t[3], t[4], t[5])
+    T = xyz2T(*sphericalToCartesian(1.0, t[0], t[1]))
+    R = rpy2R(t[2], t[3], t[4])
     E = np.dot(T, R)
     
     # Compute epipole to ignore nearest points
