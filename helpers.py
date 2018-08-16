@@ -96,7 +96,7 @@ def transformCamera(p, display=True, x=0, y=0, z=0,
     
     # Display camera image 
     if display:
-        plt.plot(u, v, 'b*'), plt.axis([-bu, bu, -bv, bv]), plt.gca().invert_yaxis()
+        plt.plot(u, v, 'b*'), plt.axis([-bu*f, bu*f, -bv*f, bv*f]), plt.gca().invert_yaxis()
         plt.show()
     return np.concatenate((u, v), axis = 1)
     
@@ -153,9 +153,21 @@ def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t):
     R = rpy2R(t[2], t[3], t[4])
     E = np.dot(T, R)
     
+    if t.shape[0] == 7:
+        # Find F using intrinsic parameters (A matrices are inverses of K matrices)
+        # Currently, t[5] and t[6] are log(fk) for camera 1 and 2
+        fk_inv_1 = 10**-t[5]
+        fk_inv_2 = 10**-t[6]
+        A1 = np.array([[ fk_inv_1, 0, 0], [0, fk_inv_1, 0], [0,0,1]])
+        A2 = np.array([[ fk_inv_2, 0, 0], [0, fk_inv_2, 0], [0,0,1]])
+        E  = A1 @ E @ A2
+
     # Compute epipole to ignore nearest points
     epipole = null_space(E.T)
     epipole = (epipole / epipole[2])[:2,0]  # Normalise to image point (u, v, 1)
+
+    if t.shape[0] == 7:
+        epipole = epipole * 10**t[5] # Then scale by fk
 
     lines1 = cv2.computeCorrespondEpilines(pts2.reshape(-1,1,2), 1, E) # Shape: (n_pts2, 3)
     curr_indices = list(range(pts1.shape[0]))
