@@ -169,21 +169,19 @@ def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t):
     if t.shape[0] == 7:
         epipole = epipole * 10**t[5] # Then scale by fk
 
+    # Set near-epipole points in pts1 to np.nan
+    pts1[np.linalg.norm(pts1-epipole, axis=1) < epipole_t] = np.nan
+
     lines1 = cv2.computeCorrespondEpilines(pts2.reshape(-1,1,2), 1, E) # Shape: (n_pts2, 3)
     curr_indices = list(range(pts1.shape[0]))
     
     for j in range(lines1.shape[0]):
         sqdists = getEpilineDeviations(lines1[j, :], pts1)
         
-        # Ignore points in pts1 too close to epipole
-        for k in range(pts1.shape[0]):
-            if np.linalg.norm(pts1[k]-epipole) < epipole_t:
-                sqdists[k] = inf
-        
         if np.any(sqdists < epsilon):
             score += 1
             
-            min_pt = curr_indices[np.argmin(sqdists)]
+            min_pt = curr_indices[np.nanargmin(sqdists)]
             if j != min_pt or j >= n_corr:
                 # print("not a match:" + str(j) + " " + str(np.argmin(sqdists)))
                 mismatches += 1
