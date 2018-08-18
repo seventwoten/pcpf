@@ -117,7 +117,7 @@ def getEpilineDeviations(line, pts1):
     d = np.dot(pts, line.T)
     
     # Vertical distance from line is d/b
-    return d/line[0,1]
+    return np.abs(d/line[0,1])
     
 def generateSamples(n_samples, ranges):
     ''' Returns n_samples uniformly-distributed sample guesses in 
@@ -232,6 +232,7 @@ def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 1, epipole_t = 0.01, 
         # Perturb sample state
         pt = S[:dim,ind]
         t = np.random.normal(loc=pt, scale=sigma, size=None)
+        t[:5] = (t[:5] + pi) % (2 * pi) - pi
         
         score, sample_mismatches = computeScore(t, pts1, pts2, n_corr, epsilon, epipole_t)
         score_list.append(score)
