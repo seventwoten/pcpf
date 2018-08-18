@@ -102,7 +102,7 @@ def transformCamera(p, display=True, x=0, y=0, z=0,
     
 def getEpilineDeviations(line, pts1):
     ''' 
-        Returns squared vertical distances of img 1 points from epipolar line. Shape: (n_points, 1)
+        Returns vertical distances of img 1 points from epipolar line. Shape: (n_points, 1)
 
         Parameters
         ----------
@@ -116,8 +116,8 @@ def getEpilineDeviations(line, pts1):
     # Compute result of au + bv + c = d. Shape: (n_points, 1)
     d = np.dot(pts, line.T)
     
-    # Vertical distance from line is d/b. Compute square of this distance:
-    return (d/line[0,1]) ** 2
+    # Vertical distance from line is d/b
+    return d/line[0,1]
     
 def generateSamples(n_samples, ranges):
     ''' Returns n_samples uniformly-distributed sample guesses in 
@@ -171,25 +171,34 @@ def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t):
 
     # Set near-epipole points in pts1 to np.nan
     pts1[np.linalg.norm(pts1-epipole, axis=1) < epipole_t] = np.nan
-
-    lines1 = cv2.computeCorrespondEpilines(pts2.reshape(-1,1,2), 1, E) # Shape: (n_pts2, 3)
-    curr_indices = list(range(pts1.shape[0]))
     
-    for j in range(lines1.shape[0]):
-        sqdists = getEpilineDeviations(lines1[j, :], pts1)
-        
-        if np.any(sqdists < epsilon):
-            score += 1
-            
-            min_pt = curr_indices[np.nanargmin(sqdists)]
-            if j != min_pt or j >= n_corr:
-                # print("not a match:" + str(j) + " " + str(np.argmin(sqdists)))
-                mismatches += 1
-                
-            # choose the point with smallest sqdist, remove it from matchable points pts1
-            curr_indices.remove(min_pt)
-            pts1 = orig_pts1[curr_indices]
-            
+    # Vectorised method for finding absolute vertical epiline-point dists
+    pts1_uvf = np.concatenate((pts1, np.ones((pts1.shape[0], 1))), axis = 1)
+    pts2_uvf = np.concatenate((pts2, np.ones((pts2.shape[0], 1))), axis = 1)
+    
+    b1 = (E[1,:] @ pts2_uvf.T).reshape(1,-1)   # 1 x n'
+    d = pts1_uvf @ E @ pts2_uvf.T              # n x n'
+    
+    dists = np.abs(d / b1)                     # n x n'
+    
+    # Count matches: enforce one-to-one matching and prioritise closest matches first
+    all_matches = dists < epsilon
+    indices = np.array(np.where(all_matches)).T
+    indices_sorted = indices[np.argsort(dists[all_matches])]
+    
+    curr_rows = list(np.unique(indices_sorted[:,0]))
+    curr_cols = list(np.unique(indices_sorted[:,1]))
+    
+    score = 0
+    for i in range(indices_sorted.shape[0]):
+        if curr_rows and curr_cols:
+            if indices_sorted[i, 0] in curr_rows and indices_sorted[i, 1] in curr_cols:
+                curr_rows.remove(indices_sorted[i, 0])
+                curr_cols.remove(indices_sorted[i, 1])
+                score += 1
+                if indices_sorted[i, 0] != indices_sorted[i, 1] or indices_sorted[i, 1] >= n_corr:
+                    mismatches += 1
+
     return score, mismatches
     
 def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 1, epipole_t = 0.01, norm_mode = None):
