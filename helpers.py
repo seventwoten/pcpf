@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from math import sin, cos, pi, inf, sqrt, atan
+from math import sin, cos, pi, inf, sqrt, atan, exp
 import matplotlib.pyplot as plt
 from scipy.linalg import null_space
 
@@ -156,8 +156,8 @@ def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t):
     if t.shape[0] == 7:
         # Find F using intrinsic parameters (A matrices are inverses of K matrices)
         # Currently, t[5] and t[6] are log(fk) for camera 1 and 2
-        fk_inv_1 = 10**-t[5]
-        fk_inv_2 = 10**-t[6]
+        fk_inv_1 = exp(-t[5])
+        fk_inv_2 = exp(-t[6])
         A1 = np.array([[ fk_inv_1, 0, 0], [0, fk_inv_1, 0], [0,0,1]])
         A2 = np.array([[ fk_inv_2, 0, 0], [0, fk_inv_2, 0], [0,0,1]])
         E  = A1 @ E @ A2
@@ -167,7 +167,7 @@ def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t):
     epipole = (epipole / epipole[2])[:2,0]  # Normalise to image point (u, v, 1)
 
     if t.shape[0] == 7:
-        epipole = epipole * 10**t[5] # Then scale by fk
+        epipole = epipole * exp(t[5]) # Then scale by fk
 
     # Set near-epipole points in pts1 to np.nan
     pts1[np.linalg.norm(pts1-epipole, axis=1) < epipole_t] = np.nan
@@ -176,9 +176,10 @@ def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t):
     pts1_uvf = np.concatenate((pts1, np.ones((pts1.shape[0], 1))), axis = 1)
     pts2_uvf = np.concatenate((pts2, np.ones((pts2.shape[0], 1))), axis = 1)
     
-    b1 = (E[1,:] @ pts2_uvf.T).reshape(1,-1)   # 1 x n'
-    d = pts1_uvf @ E @ pts2_uvf.T              # n x n'
-    
+    epilines = E @ pts2_uvf.T
+    b1 = (epilines[1,:]).reshape(1,-1)         # 1 x n'
+    d = pts1_uvf @ epilines                    # n x n'
+
     dists = np.abs(d / b1)                     # n x n'
     
     # Count matches: enforce one-to-one matching and prioritise closest matches first
