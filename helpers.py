@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from math import sin, cos, pi, inf, sqrt, atan, exp
+from math import sin, cos, pi, inf, sqrt, atan, acos, exp
 import matplotlib.pyplot as plt
 from scipy.linalg import null_space
 
@@ -64,7 +64,14 @@ def rpy2R(roll, pitch, yaw):
                   [-sin_y     ,  cos_y*sin_p                    ,  cos_y*cos_p                    ]])
     
     return R
-
+    
+def R2rpy(R):
+    r = atan(R[2,0]/R[2,1])
+    p = acos(R[2,2])
+    y = -atan(R[0,2]/R[1,2])
+    
+    return r, p, y
+    
 def xyz2T(x, y, z):
     T = np.array([[  0, -z,  y ],
                   [  z,  0, -x ],
@@ -191,20 +198,25 @@ def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t):
     curr_cols = list(np.unique(indices_sorted[:,1]))
     
     score = 0
+    corr_indices = []
     for i in range(indices_sorted.shape[0]):
         if curr_rows and curr_cols:
             if indices_sorted[i, 0] in curr_rows and indices_sorted[i, 1] in curr_cols:
                 curr_rows.remove(indices_sorted[i, 0])
                 curr_cols.remove(indices_sorted[i, 1])
                 score += 1
+                
+                # Store correspondence
+                corr_indices.append(indices_sorted[i])
+                
                 # Check mismatches if ground truth is known
                 if n_corr:
                     if indices_sorted[i, 0] != indices_sorted[i, 1] or indices_sorted[i, 1] >= n_corr:
                         mismatches += 1
 
-    return score, mismatches
+    return score, mismatches, np.array(corr_indices)
     
-def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 1, epipole_t = 0.01, norm_mode = None):
+def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 1, epipole_t = 0.01, norm_mode = None, resampling = None):
     ''' S         - Represents state-weight pairs. Shape: (dim+1, m) 
                     The first dim rows store m sample states, and the last row stores their importance weights. 
         sigma     - Standard deviation of Gaussian used for resampling in dim dimensions
@@ -217,6 +229,10 @@ def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 1, epipole_t = 0.01, 
         norm_mode - Mode of normalisation for importance weights. 
                     Default  : divide by total of scores over all samples.
                     "softmax": take exp() of each score and normalise over all samples. 
+       resampling - Method for generating new offspring points each iteration. 
+                    None     - Gaussian resampling, with given sigma, from neighbourhood in dim dimensions 
+                    ComputeF - use estimated correspondences to compute F/E matrix as next guess
+                   
     '''
     dim = S.shape[0] - 1
     m   = S.shape[1]
@@ -233,16 +249,39 @@ def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 1, epipole_t = 0.01, 
         # Sample with replacement
         ind = np.random.choice(m, 1, p=S[dim,:].tolist())[0]
         
-        # Perturb sample state
-        pt = S[:dim,ind]
-        t = np.random.normal(loc=pt, scale=sigma, size=None)
-        t[:5] = (t[:5] + pi) % (2 * pi) - pi
-        
-        score, sample_mismatches = computeScore(t, pts1, pts2, n_corr, epsilon, epipole_t)
+        if resampling == "ComputeF":
+            t = S[:dim,ind]
+            score, sample_mismatches, corr_indices = computeScore(t, pts1, pts2, n_corr, epsilon, epipole_t)
+            
+            score = 0
+            
+            # Compute F from corr_indices (Essential matrix for now)
+            if len(corr_indices) >= 8:
+                F, inliers = cv2.findEssentialMat(pts1[corr_indices[:,0]], pts2[corr_indices[:,1]])
+                
+                if inliers is not None: 
+                    score = sum(inliers)[0]
+                    
+                    # Add one new point to output S_new
+                    R1, R2, t1 = cv2.decomposeEssentialMat(F)
+                    r, theta, phi = cartesianToSpherical(t1[0],t1[1],t1[2])
+                    roll, p, y = R2rpy(R1)
+                    
+                    t = [theta, phi, roll, p, y]
+            
+        else:
+            # Perturb sample state
+            pt = S[:dim,ind]
+            t = np.random.normal(loc=pt, scale=sigma, size=None)
+            t[:5] = (t[:5] + pi) % (2 * pi) - pi
+            
+            score, sample_mismatches, corr_indices = computeScore(t, pts1, pts2, n_corr, epsilon, epipole_t)
+            
+        # Keep track of score and matches
         score_list.append(score)
         matches += score
         mismatches += sample_mismatches
-        
+            
         # Add new point to output S_new
         new_pt = np.array([[*t, score]]).T
         S_new = np.concatenate((S_new, new_pt), axis = 1)
