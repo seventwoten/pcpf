@@ -252,7 +252,8 @@ def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 1, epipole_t = 0.01, 
     # Normalise weights in S_new
     if norm_mode == "softmax": 
         # Use softmax function
-        S_new[dim,:] = np.exp(S_new[dim,:]) / np.sum(np.exp(S_new[dim,:]))
+        max_corr = min(pts1.shape[0], pts2.shape[0])
+        S_new[dim,:] = np.exp(S_new[dim,:] / max_corr) / np.sum(np.exp(S_new[dim,:] / max_corr))
         
     else:
         S_new[dim,:] = S_new[dim,:]/normaliser
