@@ -197,8 +197,10 @@ def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t):
                 curr_rows.remove(indices_sorted[i, 0])
                 curr_cols.remove(indices_sorted[i, 1])
                 score += 1
-                if indices_sorted[i, 0] != indices_sorted[i, 1] or indices_sorted[i, 1] >= n_corr:
-                    mismatches += 1
+                # Check mismatches if ground truth is known
+                if n_corr:
+                    if indices_sorted[i, 0] != indices_sorted[i, 1] or indices_sorted[i, 1] >= n_corr:
+                        mismatches += 1
 
     return score, mismatches
     
@@ -208,7 +210,8 @@ def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 1, epipole_t = 0.01, 
         sigma     - Standard deviation of Gaussian used for resampling in dim dimensions
         pts1      - Points from first image
         pts2      - Points from second image (used to draw epilines on first image)
-        n_corr    - The first n_corr points in each image are true correspondences, and the rest are noise points
+        n_corr    - The first n_corr points in each image are true correspondences, and the rest are noise points.
+                    If zero, indicates ground truth is unknown.
         epsilon   - Threshold of squared vertical deviation, for counting a point as "near" to an epiline
         epipole_t - Threshold for ignoring a point too close to epipole
         norm_mode - Mode of normalisation for importance weights. 
