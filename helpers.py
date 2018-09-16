@@ -179,15 +179,20 @@ def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t):
     # Set near-epipole points in pts1 to np.nan
     pts1[np.linalg.norm(pts1-epipole, axis=1) < epipole_t] = np.nan
     
-    # Vectorised method for finding absolute vertical epiline-point dists
+    # Vectorised method for finding Sampson's distance
     pts1_uvf = np.concatenate((pts1, np.ones((pts1.shape[0], 1))), axis = 1)
     pts2_uvf = np.concatenate((pts2, np.ones((pts2.shape[0], 1))), axis = 1)
     
-    epilines = E @ pts2_uvf.T
-    b1 = (epilines[1,:]).reshape(1,-1)         # 1 x n'
-    d = pts1_uvf @ epilines                    # n x n'
-
-    dists = np.abs(d / b1)                     # n x n'
+    epilines1 = E @ pts2_uvf.T
+    ab1 = (epilines1[:2,:]).reshape(2,-1)      # 2  x n
+    
+    epilines2 = pts1_uvf @ E
+    ab2 = (epilines2[:,:2].T).reshape(2,-1)    # 2  x n
+    
+    d = pts1_uvf @ epilines1                   # n' x n
+    
+    denom = np.sum(np.vstack((ab1, ab2))**2, axis = 0)**0.5  # 1  x n
+    dists = np.abs(d / denom)                  # n' x n
     
     # Count matches: enforce one-to-one matching and prioritise closest matches first
     all_matches = dists < epsilon
