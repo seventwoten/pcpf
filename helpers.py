@@ -170,7 +170,7 @@ def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t):
         E  = A1 @ E @ A2
 
     # Compute epipole to ignore nearest points
-    epipole = null_space(E.T)
+    epipole = null_space(E.T, )
     epipole = (epipole / epipole[2])[:2,0]  # Normalise to image point (u, v, 1)
 
     if t.shape[0] == 7:
@@ -245,6 +245,16 @@ def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 1, epipole_t = 0.01, 
     mismatches = 0
     matches = 0
     
+    # Normalise weights in S
+    if norm_mode == "softmax": 
+        # Use softmax function
+        max_corr = min(pts1.shape[0], pts2.shape[0])
+        S[dim,:] = (np.exp(S[dim,:] / max_corr) - 1) / np.sum(np.exp(S[dim,:] / max_corr) - 1)
+        
+    else:
+        S[dim,:] = S[dim,:] / np.sum(S[dim,:])
+
+
     for i in range(m):
         # Sample with replacement
         ind = np.random.choice(m, 1, p=S[dim,:].tolist())[0]
@@ -287,17 +297,6 @@ def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 1, epipole_t = 0.01, 
         S_new = np.concatenate((S_new, new_pt), axis = 1)
         
         normaliser += score
-    
-    # Normalise weights in S_new
-    if norm_mode == "softmax": 
-        # Use softmax function
-        max_corr = min(pts1.shape[0], pts2.shape[0])
-        S_new[dim,:] = np.exp(S_new[dim,:] / max_corr) / np.sum(np.exp(S_new[dim,:] / max_corr))
-        
-    else:
-        S_new[dim,:] = S_new[dim,:]/normaliser
-    
-    
     
     return S_new, score_list, mismatches, matches
     
