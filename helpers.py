@@ -237,7 +237,6 @@ def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 1, epipole_t = 0.01, 
     dim = S.shape[0] - 1
     m   = S.shape[1]
     weights = np.zeros((1, m))
-    normaliser = 0
     S_new = np.empty((dim+1, 0))
     
     # for debugging 
@@ -266,16 +265,16 @@ def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 1, epipole_t = 0.01, 
             score = 0
             
             # Compute F from corr_indices (Essential matrix for now)
-            if len(corr_indices) >= 8:
-                F, inliers = cv2.findEssentialMat(pts1[corr_indices[:,0]], pts2[corr_indices[:,1]])
+            if len(corr_indices) >= 6:
+                F, inliers = cv2.findEssentialMat(pts2[corr_indices[:,1]], pts1[corr_indices[:,0]], threshold = 0.002)
                 
                 if inliers is not None: 
                     score = sum(inliers)[0]
                     
                     # Add one new point to output S_new
-                    R1, R2, t1 = cv2.decomposeEssentialMat(F)
-                    r, theta, phi = cartesianToSpherical(t1[0],t1[1],t1[2])
-                    roll, p, y = R2rpy(R1)
+                    points, R, t, mask = cv2.recoverPose(F, pts2, pts1)
+                    r, theta, phi = cartesianToSpherical(t[0],t[1],t[2])
+                    roll, p, y = R2rpy(R)
                     
                     t = [theta, phi, roll, p, y]
             
@@ -295,8 +294,6 @@ def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 1, epipole_t = 0.01, 
         # Add new point to output S_new
         new_pt = np.array([[*t, score]]).T
         S_new = np.concatenate((S_new, new_pt), axis = 1)
-        
-        normaliser += score
     
     return S_new, score_list, mismatches, matches
     
