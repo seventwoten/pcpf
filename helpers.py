@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from math import sin, cos, pi, inf, sqrt, atan, acos, exp
+from math import sin, cos, pi, inf, sqrt, atan2, asin, exp
 import matplotlib.pyplot as plt
 from scipy.linalg import null_space
 
@@ -66,10 +66,20 @@ def rpy2R(roll, pitch, yaw):
     return R
     
 def R2rpy(R):
-    r = atan(R[2,0]/R[2,1])
-    p = acos(R[2,2])
-    y = -atan(R[0,2]/R[1,2])
-    
+
+    sy = sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
+    singular = sy < 1e-6
+ 
+    if not singular :
+        r = atan2( R[1,0], R[0,0])
+        p = atan2( R[2,1], R[2,2])
+        y = atan2(-R[2,0], sy)
+
+    else :
+        p = atan2(-R[1,2], R[1,1])
+        y = atan2(-R[2,0], sy)
+        r = 0
+        
     return r, p, y
     
 def xyz2T(x, y, z):
@@ -145,8 +155,8 @@ def sphericalToCartesian(r, theta, phi):
 
 def cartesianToSpherical(x, y, z):
     r     = sqrt(x**2 + y**2 + z**2)
-    theta = atan(y/x)
-    phi   = atan(sqrt(x**2 + y**2)/z)
+    theta = atan2(y,x)
+    phi   = atan2(sqrt(x**2 + y**2),z)
     return r, theta, phi    
     
 def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t):
@@ -158,7 +168,7 @@ def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t):
     
     T = xyz2T(*sphericalToCartesian(1.0, t[0], t[1]))
     R = rpy2R(t[2], t[3], t[4])
-    E = np.dot(T, R)
+    E = np.dot((1/sqrt(2))*T, R)
     
     if t.shape[0] == 7:
         # Find F using intrinsic parameters (A matrices are inverses of K matrices)
