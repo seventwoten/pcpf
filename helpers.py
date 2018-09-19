@@ -231,7 +231,7 @@ def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t):
 
     return score, mismatches, np.array(corr_indices)
     
-def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 1, epipole_t = 0.01, norm_mode = None, resampling = None):
+def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 0.01, epipole_t = 0.1, norm_mode = None, resampling = None):
     ''' S         - Represents state-weight pairs. Shape: (dim+1, m) 
                     The first dim rows store m sample states, and the last row stores their importance weights. 
         sigma     - Standard deviation of Gaussian used for resampling in dim dimensions
@@ -302,13 +302,14 @@ def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 1, epipole_t = 0.01, 
             score, sample_mismatches, corr_indices = computeScore(t, pts1, pts2, n_corr, epsilon, epipole_t)
             
         # Keep track of score and matches
-        score_list.append(score)
         matches += score
         mismatches += sample_mismatches
             
         # Add new point to output S_new
-        new_pt = np.array([[*t, score]]).T
-        S_new = np.concatenate((S_new, new_pt), axis = 1)
+        if resampling != "ComputeF" or score > 0:
+            new_pt = np.array([[*t, score]]).T
+            S_new = np.concatenate((S_new, new_pt), axis = 1)
+            score_list.append(score)
     
     return S_new, score_list, mismatches, matches
     
