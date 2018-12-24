@@ -281,8 +281,12 @@ def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 0.01, epipole_t = 0.1
             
             # Compute F from corr_indices (Essential matrix for now)
             if len(corr_indices) >= 6:
-                F, inliers = cv2.findEssentialMat(pts2[corr_indices[:,1]], pts1[corr_indices[:,0]], threshold = 0.002)
-                
+                if len(corr_indices) < 8:
+                    F, inliers = cv2.findEssentialMat(pts2[corr_indices[:,1]], pts1[corr_indices[:,0]], threshold = 0.002)
+                else:
+                    F, inliers = cv2.findFundamentalMat(pts2[corr_indices[:,1]], pts1[corr_indices[:,0]], method = cv2.FM_8POINT, ransacReprojThreshold = 0.002)
+                    F = F / np.linalg.norm(F)
+
                 if inliers is not None: 
                     score = sum(inliers)[0]
                     
@@ -312,4 +316,3 @@ def ParticleFilter(S, sigma, pts1, pts2, n_corr, epsilon = 0.01, epipole_t = 0.1
             score_list.append(score)
     
     return S_new, score_list, mismatches, matches
-    
