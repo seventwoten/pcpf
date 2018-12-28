@@ -159,7 +159,7 @@ def cartesianToSpherical(x, y, z):
     phi   = atan2(sqrt(x**2 + y**2),z)
     return r, theta, phi    
     
-def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t):
+def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t, mode = None):
     ''' Computes score of sample state t
     '''
     score = 0
@@ -219,8 +219,12 @@ def computeScore(t, orig_pts1, pts2, n_corr, epsilon, epipole_t):
             if indices_sorted[i, 0] in curr_rows and indices_sorted[i, 1] in curr_cols:
                 curr_rows.remove(indices_sorted[i, 0])
                 curr_cols.remove(indices_sorted[i, 1])
-                score += 1
                 
+                if mode is None:
+                    score += 1
+                else:
+                    score += epsilon - dists[indices_sorted[i, 0], indices_sorted[i, 1]]
+
                 # Store correspondence
                 corr_indices.append(indices_sorted[i])
                 
