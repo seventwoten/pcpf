@@ -148,9 +148,14 @@ def generateSamples(n_samples, ranges):
     return samples
 
 def sphericalToCartesian(r, theta, phi):
-    x = r * sin(phi) * cos(theta)
-    y = r * sin(phi) * sin(theta)
-    z = r * cos(phi)
+    sp = sin(phi)
+    cp = cos(phi)
+    st = sin(theta)
+    ct = cos(theta)
+
+    x = r * sp * ct
+    y = r * sp * st
+    z = r * cp
     return x, y, z
 
 def cartesianToSpherical(x, y, z):
